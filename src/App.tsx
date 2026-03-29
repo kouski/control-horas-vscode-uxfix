@@ -548,6 +548,11 @@ export default function App() {
     [data.workers, currentYear, currentMonth],
   )
 
+  const grandTotalPay = useMemo(
+    () => workerRows.reduce((sum, { monthly }) => sum + monthly.totalPay, 0),
+    [workerRows],
+  )
+
   return (
     <div className="app-shell">
       {loading && (
@@ -775,6 +780,13 @@ export default function App() {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr className="total-row">
+                    <td colSpan={3} className="text-right"><strong>TOTAL A COBRAR:</strong></td>
+                    <td className="text-right"><strong>{currency(grandTotalPay)}</strong></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </section>

@@ -461,6 +461,17 @@ textarea { resize: vertical; }
   text-align: right;
 }
 
+.report-table tfoot .total-row td {
+  background: #f1f5f9;
+  border-bottom: 2px solid #cbd5e1;
+  padding: 16px 14px;
+}
+
+.report-table tfoot .total-row strong {
+  font-size: 16px;
+  color: #0f172a;
+}
+
 /* Print Styles */
 @media print {
   body {
