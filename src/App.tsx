@@ -239,11 +239,13 @@ function DayCell({
   entry,
   festive,
   onHoursChange,
+  onHoursBlur,
   onOpenMeta,
 }: {
   entry: DayEntry
   festive: boolean
   onHoursChange: (hours: number) => void
+  onHoursBlur: () => void
   onOpenMeta: () => void
 }) {
   return (
@@ -255,6 +257,7 @@ function DayCell({
         step="0.25"
         value={entry.workedHours === 0 ? '' : String(entry.workedHours)}
         onChange={(e) => onHoursChange(numberOrZero(e.target.value))}
+        onBlur={onHoursBlur}
         aria-label="Horas trabajadas del día"
       />
       <span className="day-cell-note">{entry.observation ? 'Obs' : ''}</span>
@@ -433,7 +436,7 @@ export default function App() {
     if (error) console.error('Error updating worker:', error)
   }
 
-  function updateDay(workerId: string, dateKey: string, entry: DayEntry) {
+  function updateDay(workerId: string, dateKey: string, entry: DayEntry, force: boolean = false) {
     // 1. Update local state immediately
     setData((prev) => ({
       ...prev,
@@ -446,7 +449,7 @@ export default function App() {
       }),
     }))
 
-    // 2. Debounce Supabase sync
+    // 2. Debounce or Force Supabase sync
     const syncKey = `${workerId}:${dateKey}`
     if (syncTimeouts.current[syncKey]) {
       clearTimeout(syncTimeouts.current[syncKey])
@@ -454,7 +457,7 @@ export default function App() {
 
     pendingUpdates.current[syncKey] = entry
 
-    syncTimeouts.current[syncKey] = setTimeout(async () => {
+    const performSync = async () => {
       const latestEntry = pendingUpdates.current[syncKey]
       if (!latestEntry) return
 
@@ -471,7 +474,13 @@ export default function App() {
         delete pendingUpdates.current[syncKey]
       }
       delete syncTimeouts.current[syncKey]
-    }, 1000)
+    }
+
+    if (force) {
+      performSync()
+    } else {
+      syncTimeouts.current[syncKey] = setTimeout(performSync, 1000)
+    }
   }
 
   async function updateMonthlyCities(workerId: string, text: string) {
@@ -547,15 +556,23 @@ export default function App() {
     const file = event.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const parsed = JSON.parse(String(reader.result)) as AppData
         if (parsed?.workers) {
           setData(parsed)
           setSelectedWorkerId(parsed.workers[0]?.id || '')
+
+          // Sync restored data to Supabase immediately after import
+          setLoading(true)
+          await syncToSupabase(parsed)
+          setLoading(false)
+          alert('Datos restaurados y sincronizados con éxito.')
         }
-      } catch {
-        // ignore invalid file
+      } catch (err) {
+        console.error('Error importing JSON:', err)
+        setLoading(false)
+        alert('Error al restaurar los datos.')
       }
     }
     reader.readAsText(file)
@@ -707,6 +724,7 @@ export default function App() {
                               entry={entry}
                               festive={festiveCell}
                               onHoursChange={(hours) => updateDay(worker.id, dateKey, { ...entry, workedHours: hours })}
+                              onHoursBlur={() => updateDay(worker.id, dateKey, entry, true)}
                               onOpenMeta={() => {
                                 setMetaWorkerId(worker.id)
                                 setMetaDateKey(dateKey)
@@ -826,7 +844,7 @@ export default function App() {
         entry={activeMetaEntry}
         onClose={() => setMetaOpen(false)}
         onSave={(entry) => {
-          if (metaWorkerId && metaDateKey) updateDay(metaWorkerId, metaDateKey, entry)
+          if (metaWorkerId && metaDateKey) updateDay(metaWorkerId, metaDateKey, entry, true)
           setMetaOpen(false)
         }}
       />
