@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './supabase'
 
 type DayEntry = {
@@ -410,6 +410,9 @@ export default function App() {
   const daysInMonth = getDaysInMonth(currentYear, currentMonth)
   const dayNumbers = Array.from({ length: daysInMonth }, (_, i) => i + 1)
 
+  const syncTimeouts = useRef<Record<string, any>>({})
+  const pendingUpdates = useRef<Record<string, DayEntry>>({})
+
   async function updateWorker(workerId: string, updater: (worker: Worker) => Worker) {
     const currentWorker = data.workers.find(w => w.id === workerId)
     if (!currentWorker) return
@@ -430,20 +433,45 @@ export default function App() {
     if (error) console.error('Error updating worker:', error)
   }
 
-  async function updateDay(workerId: string, dateKey: string, entry: DayEntry) {
-    updateWorker(workerId, (worker) => ({
-      ...worker,
-      entries: { ...worker.entries, [dateKey]: entry },
+  function updateDay(workerId: string, dateKey: string, entry: DayEntry) {
+    // 1. Update local state immediately
+    setData((prev) => ({
+      ...prev,
+      workers: prev.workers.map((w) => {
+        if (w.id !== workerId) return w
+        return {
+          ...w,
+          entries: { ...w.entries, [dateKey]: entry },
+        }
+      }),
     }))
 
-    const { error } = await supabase.from('entries').upsert({
-      worker_id: workerId,
-      date: dateKey,
-      worked_hours: entry.workedHours,
-      observation: entry.observation,
-      is_holiday: entry.isHoliday,
-    })
-    if (error) console.error('Error updating day:', error)
+    // 2. Debounce Supabase sync
+    const syncKey = `${workerId}:${dateKey}`
+    if (syncTimeouts.current[syncKey]) {
+      clearTimeout(syncTimeouts.current[syncKey])
+    }
+
+    pendingUpdates.current[syncKey] = entry
+
+    syncTimeouts.current[syncKey] = setTimeout(async () => {
+      const latestEntry = pendingUpdates.current[syncKey]
+      if (!latestEntry) return
+
+      const { error } = await supabase.from('entries').upsert({
+        worker_id: workerId,
+        date: dateKey,
+        worked_hours: latestEntry.workedHours,
+        observation: latestEntry.observation,
+        is_holiday: latestEntry.isHoliday,
+      })
+      if (error) {
+        console.error('Error updating day in Supabase:', error)
+      } else {
+        delete pendingUpdates.current[syncKey]
+      }
+      delete syncTimeouts.current[syncKey]
+    }, 1000)
   }
 
   async function updateMonthlyCities(workerId: string, text: string) {
