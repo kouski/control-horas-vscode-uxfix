@@ -821,9 +821,9 @@ export default function App() {
                 <thead>
                   <tr>
                     <th>Nombre y Apellidos</th>
+                    <th className="text-right">Total a Cobrar</th>
                     <th className="text-right">H. Extra L-V</th>
                     <th className="text-right">H. Extra F</th>
-                    <th className="text-right">Total a Cobrar</th>
                     <th>Ciudades</th>
                   </tr>
                 </thead>
@@ -831,17 +831,18 @@ export default function App() {
                   {workerRows.map(({ worker, monthly }) => (
                     <tr key={worker.id}>
                       <td><strong>{worker.name}</strong><br /><small>{worker.role}</small></td>
+                      <td className="text-right"><strong>{currency(monthly.totalPay)}</strong></td>
                       <td className="text-right">{monthly.totalOvertimeNormalHours}</td>
                       <td className="text-right">{monthly.totalOvertimeFestiveHours}</td>
-                      <td className="text-right"><strong>{currency(monthly.totalPay)}</strong></td>
                       <td><small>{monthly.citiesText || '-'}</small></td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="total-row">
-                    <td colSpan={3} className="text-right"><strong>TOTAL A COBRAR:</strong></td>
+                    <td className="text-right"><strong>TOTAL A COBRAR:</strong></td>
                     <td className="text-right"><strong>{currency(grandTotalPay)}</strong></td>
+                    <td colSpan={2}></td>
                     <td></td>
                   </tr>
                 </tfoot>
