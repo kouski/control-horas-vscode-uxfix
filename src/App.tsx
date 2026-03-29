@@ -149,7 +149,9 @@ async function syncToSupabase(data: AppData) {
     }))
 
     if (entriesToUpsert.length > 0) {
-      const { error: eError } = await supabase.from('entries').upsert(entriesToUpsert)
+      const { error: eError } = await supabase
+        .from('entries')
+        .upsert(entriesToUpsert, { onConflict: 'worker_id,date' })
       if (eError) console.error('Error syncing entries:', eError)
     }
 
@@ -161,7 +163,9 @@ async function syncToSupabase(data: AppData) {
     }))
 
     if (citiesToUpsert.length > 0) {
-      const { error: cError } = await supabase.from('monthly_cities').upsert(citiesToUpsert)
+      const { error: cError } = await supabase
+        .from('monthly_cities')
+        .upsert(citiesToUpsert, { onConflict: 'worker_id,month_key' })
       if (cError) console.error('Error syncing cities:', cError)
     }
   }
@@ -461,13 +465,15 @@ export default function App() {
       const latestEntry = pendingUpdates.current[syncKey]
       if (!latestEntry) return
 
-      const { error } = await supabase.from('entries').upsert({
-        worker_id: workerId,
-        date: dateKey,
-        worked_hours: latestEntry.workedHours,
-        observation: latestEntry.observation,
-        is_holiday: latestEntry.isHoliday,
-      })
+      const { error } = await supabase
+        .from('entries')
+        .upsert({
+          worker_id: workerId,
+          date: dateKey,
+          worked_hours: latestEntry.workedHours,
+          observation: latestEntry.observation,
+          is_holiday: latestEntry.isHoliday,
+        }, { onConflict: 'worker_id,date' })
       if (error) {
         console.error('Error updating day in Supabase:', error)
       } else {
