@@ -196,6 +196,12 @@ function calculateMonthlyPayroll(worker: Worker, year: number, month: number): M
   let totalOvertimeFestiveHours = 0
 
   weeklyBuckets.forEach((items) => {
+    // Festivos entre semana (L-V marcados como festivo): reducen el umbral 8 h cada uno
+    const weekdayHolidays = items.filter(
+      ({ date, entry }) => !isWeekend(date) && entry.isHoliday
+    ).length
+    const weeklyThreshold = WEEKLY_REGULAR_HOURS - weekdayHolidays * 8
+
     const weekdayHours = items
       .filter(({ date, entry }) => !isWeekend(date) && !entry.isHoliday)
       .reduce((sum, item) => sum + numberOrZero(item.entry.workedHours), 0)
@@ -204,7 +210,7 @@ function calculateMonthlyPayroll(worker: Worker, year: number, month: number): M
       .filter(({ date, entry }) => isWeekend(date) || entry.isHoliday)
       .reduce((sum, item) => sum + numberOrZero(item.entry.workedHours), 0)
 
-    totalOvertimeNormalHours += Math.max(0, weekdayHours - WEEKLY_REGULAR_HOURS)
+    totalOvertimeNormalHours += Math.max(0, weekdayHours - weeklyThreshold)
     totalOvertimeFestiveHours += festiveHours
   })
 
@@ -786,9 +792,9 @@ export default function App() {
               <section className="card detail-card">
                 <div className="card-header"><h2>Reglas aplicadas</h2></div>
                 <p className="muted">
-                  Se contabilizan 40 horas semanales de lunes a viernes como límite de jornada ordinaria para detectar excesos.
-                  El programa solo calcula y paga las horas extra de lunes a viernes y las horas extra festivas.
-                  Todas las horas de sábados, domingos o festivos marcados se consideran hora extra festiva.
+                  Se contabilizan <strong>8 horas diarias</strong> como jornada ordinaria. El umbral semanal es de <strong>40 h</strong> para una semana completa, <strong>32 h</strong> si hay 1 festivo entre semana y <strong>24 h</strong> si hay 2 festivos entre semana.
+                  Los días marcados como festivo en fin de semana o entre semana cuentan como hora extra festiva.
+                  Ejemplo: semana con 2 festivos entre semana y 8+9+9 horas trabajadas → 26 h − 24 h = <strong>2 h extra</strong>.
                 </p>
                 <div className="info-line"><strong>Ciudades del mes:</strong> <span>{selectedMonthly.citiesText || 'No hay ciudades registradas este mes.'}</span></div>
               </section>
